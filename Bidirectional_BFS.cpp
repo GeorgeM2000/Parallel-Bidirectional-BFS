@@ -4,12 +4,12 @@
 #include <queue>
 
 #define NUMBER_OF_THREADS 2 // Number of nodes
-#define N 50    // Matrix size
+#define N 1000    // Matrix size
 
 
 // Basic structure of a node
 struct Node {
-    char visited_state = 'W';
+    char visited_state;
     //u_int16_t weight;
     char thread;
     u_int16_t x;
@@ -20,11 +20,11 @@ struct Node {
 
 
 
-void Serial_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2]);   // Serial BFS algorithm
-void Parallel_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2], const char thread, bool *intersection_node_found, Node *thread_nodes);   // Parallel BFS algorithm
-void Initialize_A(Node **A);    // Initialize node matrix A
+void Serial_BFS(Node *A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2]);   // Serial BFS algorithm
+void Parallel_BFS(Node *A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2], const char thread, bool *intersection_node_found, Node *thread_nodes);   // Parallel BFS algorithm
+void Initialize_A(Node *A);    // Initialize node matrix A
 void Find_Path(Node* current_node, bool print_path_mode); // Find path from source node to destination node
-void Print_Grid(Node **A);  // Print nodes of matrix A
+void Print_Grid(Node *A);  // Print nodes of matrix A
 long usecs (void);  // Function to measure time
 void Intersect_Path(Node *thread_A_nodes, Node *thread_B_nodes);    // Intersect the path stored in the intersection node(intersection node belongs to the opposite thread) and the node from which the intersection node was detected
 
@@ -53,8 +53,7 @@ int main(void) {
    	double time;
 
     // Create node matrix A
-    Node** A = new Node *[N];
-    for(int row=0; row<N; row++) A[row] = new Node[N];
+    Node* A = (Node*)malloc(sizeof(Node) * N * N);
 
     Initialize_A(A);    // Initialize A
 
@@ -90,11 +89,10 @@ int main(void) {
     time = ((double)(t_end-t_start))/1000000;
     std::cout << "Computation Time: " << time << std::endl;
 
-    Intersect_Path(thread_A_nodes, thread_B_nodes); // Intersect path of thread A and thread B
+    //Intersect_Path(thread_A_nodes, thread_B_nodes); // Intersect path of thread A and thread B
 
     // Delete node matrix A
-    for(int row=0; row<N; row++) delete[] A[row];
-    delete[] A;
+    free(A);
 
     return 0;
 }
@@ -122,19 +120,20 @@ long usecs (void) {
     return t.tv_sec*1000000+t.tv_usec;
 }
 
-void Initialize_A(Node **A) {
+void Initialize_A(Node *A) {
     for(int i=0; i<N; i++) {
         for(int j=0; j<N; j++) {
-            A[i][j].x = i;
-            A[i][j].y = j;
+            A[i * N + j].x = i;
+            A[i * N + j].y = j;
+            A[i * N + j].visited_state = 'W';
         }
     }
 }
 
-void Print_Grid(Node **A) {
+void Print_Grid(Node *A) {
     for(int i=0; i<N; i++) {
         for(int j=0; j<N; j++) {
-            std::cout << "(" << A[i][j].x << "," << A[i][j].y << ") ";
+            std::cout << "(" << A[i * N + j].x << "," << A[i * N + j].y << ") ";
         }
         std::cout << std::endl;
     }
@@ -151,18 +150,17 @@ void Find_Path(Node* current_node, bool print_path_mode) {
         } else {
             Find_Path(current_node->parent, print_path_mode);
             std::cout << current_node->x << " " << current_node->y << std::endl;
-        }
-         
+        }   
     }
 }
 
-void Serial_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2]) {
+void Serial_BFS(Node *A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2]) {
 
-    A[src_node_pos[0]][src_node_pos[1]].visited_state = 'G';
-    A[src_node_pos[0]][src_node_pos[1]].parent = NULL;
+    A[src_node_pos[0] * N + src_node_pos[1]].visited_state = 'G';
+    A[src_node_pos[0] * N + src_node_pos[1]].parent = NULL;
 
     std::queue<Node> queue;
-    queue.push(A[src_node_pos[0]][src_node_pos[1]]);
+    queue.push(A[src_node_pos[0] * N + src_node_pos[1]]);
 
     std::cout << "Started!" << std::endl;
 
@@ -172,35 +170,34 @@ void Serial_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2])
 
         if(u.x == dest_node_pos[0] && u.y == dest_node_pos[1]) {
             std::cout << "Node Found!" << std::endl;
-            Find_Path(&A[u.x][u.y], 0);
+            //Find_Path(&A[u.x * N + u.y], 0);
             break;
 
         }
         
-
         // Moving up
-        if(u.x-1 >= 0 && A[u.x-1][u.y].visited_state == 'W') {
-            A[u.x-1][u.y].visited_state = 'G';
-            A[u.x-1][u.y].parent = &A[u.x][u.y];
-            queue.push(A[u.x-1][u.y]);
+        if(u.x-1 >= 0 && A[(u.x-1) * N + u.y].visited_state == 'W') {
+            A[(u.x-1) * N + u.y].visited_state = 'G';
+            A[(u.x-1) * N + u.y].parent = &A[u.x * N + u.y];
+            queue.push(A[(u.x-1) * N + u.y]);
         }
         // Moving Down
-        if(u.x+1 < N && A[u.x+1][u.y].visited_state == 'W') {
-            A[u.x+1][u.y].visited_state = 'G';
-            A[u.x+1][u.y].parent = &A[u.x][u.y];
-            queue.push(A[u.x+1][u.y]);
+        if(u.x+1 < N && A[(u.x+1) * N + u.y].visited_state == 'W') {
+            A[(u.x+1) * N + u.y].visited_state = 'G';
+            A[(u.x+1) * N + u.y].parent = &A[u.x * N + u.y];
+            queue.push(A[(u.x+1) * N + u.y]);
         }
         // Moving left
-        if(u.y-1 >= 0 && A[u.x][u.y-1].visited_state == 'W') {
-            A[u.x][u.y-1].visited_state = 'G';
-            A[u.x][u.y-1].parent = &A[u.x][u.y];
-            queue.push(A[u.x][u.y-1]);
+        if(u.y-1 >= 0 && A[u.x * N + (u.y-1)].visited_state == 'W') {
+            A[u.x * N + (u.y-1)].visited_state = 'G';
+            A[u.x * N + (u.y-1)].parent = &A[u.x * N + u.y];
+            queue.push(A[u.x * N + (u.y-1)]);
         }
         // Moving right
-        if(u.y+1 < N && A[u.x][u.y+1].visited_state == 'W') {
-            A[u.x][u.y+1].visited_state = 'G';
-            A[u.x][u.y+1].parent = &A[u.x][u.y];
-            queue.push(A[u.x][u.y+1]);
+        if(u.y+1 < N && A[u.x * N + (u.y+1)].visited_state == 'W') {
+            A[u.x * N + (u.y+1)].visited_state = 'G';
+            A[u.x * N + (u.y+1)].parent = &A[u.x * N + u.y];
+            queue.push(A[u.x * N + (u.y+1)]);
         }
 
         u.visited_state = 'B';
@@ -209,15 +206,15 @@ void Serial_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2])
 }
 
 
-void Parallel_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2], const char thread, bool *intersection_node_found, Node *thread_nodes) {
+void Parallel_BFS(Node *A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2], const char thread, bool *intersection_node_found, Node *thread_nodes) {
 
-    A[src_node_pos[0]][src_node_pos[1]].visited_state = 'G';
-    A[src_node_pos[0]][src_node_pos[1]].parent = NULL;
-    A[src_node_pos[0]][src_node_pos[1]].thread = thread;
+    A[src_node_pos[0] * N + src_node_pos[1]].visited_state = 'G';
+    A[src_node_pos[0] * N + src_node_pos[1]].parent = NULL;
+    A[src_node_pos[0] * N + src_node_pos[1]].thread = thread;
 
 
     std::queue<Node> queue;
-    queue.push(A[src_node_pos[0]][src_node_pos[1]]);
+    queue.push(A[src_node_pos[0] * N + src_node_pos[1]]);
 
     std::cout << "Started!" << std::endl;
 
@@ -237,59 +234,59 @@ void Parallel_BFS(Node **A, u_int16_t src_node_pos[2], u_int16_t dest_node_pos[2
 
         // Moving up
         if(u.x-1 >= 0) {
-            if(A[u.x-1][u.y].visited_state == 'W') {
-                A[u.x-1][u.y].visited_state = 'G';
-                A[u.x-1][u.y].thread = thread;
-                A[u.x-1][u.y].parent = &A[u.x][u.y];
-                queue.push(A[u.x-1][u.y]);
+            if(A[(u.x-1) * N + u.y].visited_state == 'W') {
+                A[(u.x-1) * N + u.y].visited_state = 'G';
+                A[(u.x-1) * N + u.y].thread = thread;
+                A[(u.x-1) * N + u.y].parent = &A[u.x * N + u.y];
+                queue.push(A[(u.x-1) * N + u.y]);
             } 
-            else if((A[u.x-1][u.y].visited_state == 'G' || A[u.x-1][u.y].visited_state == 'B') && A[u.x-1][u.y].thread != thread) {
+            else if((A[(u.x-1) * N + u.y].visited_state == 'G' || A[(u.x-1) * N + u.y].visited_state == 'B') && A[(u.x-1) * N + u.y].thread != thread) {
                 *intersection_node_found = true;
-                thread_nodes[0] = A[u.x][u.y]; thread_nodes[1] = A[u.x-1][u.y];
+                thread_nodes[0] = A[u.x * N + u.y]; thread_nodes[1] = A[(u.x-1) * N + u.y];
                 break;
             }
         } 
 
         // Moving Down
         if(u.x+1 < N) {
-            if(A[u.x+1][u.y].visited_state == 'W') {
-                A[u.x+1][u.y].visited_state = 'G';
-                A[u.x+1][u.y].thread = thread;
-                A[u.x+1][u.y].parent = &A[u.x][u.y];
-                queue.push(A[u.x+1][u.y]);
+            if(A[(u.x+1) * N + u.y].visited_state == 'W') {
+                A[(u.x+1) * N + u.y].visited_state = 'G';
+                A[(u.x+1) * N + u.y].thread = thread;
+                A[(u.x+1) * N + u.y].parent = &A[u.x * N + u.y];
+                queue.push(A[(u.x+1) * N + u.y]);
             }
-            else if((A[u.x+1][u.y].visited_state == 'G' || A[u.x+1][u.y].visited_state == 'B') && A[u.x+1][u.y].thread != thread) {
+            else if((A[(u.x+1) * N + u.y].visited_state == 'G' || A[(u.x+1) * N + u.y].visited_state == 'B') && A[(u.x+1) * N + u.y].thread != thread) {
                 *intersection_node_found = true;
-                thread_nodes[0] = A[u.x][u.y]; thread_nodes[1] = A[u.x+1][u.y];
+                thread_nodes[0] = A[u.x * N + u.y]; thread_nodes[1] = A[(u.x+1) * N + u.y];
                 break;
             }
         }
 
         // Moving left
         if(u.y-1 >= 0) {
-            if(A[u.x][u.y-1].visited_state == 'W') {
-                A[u.x][u.y-1].visited_state = 'G';
-                A[u.x][u.y-1].thread = thread;
-                A[u.x][u.y-1].parent = &A[u.x][u.y];
-                queue.push(A[u.x][u.y-1]);
+            if(A[u.x * N + (u.y-1)].visited_state == 'W') {
+                A[u.x * N + (u.y-1)].visited_state = 'G';
+                A[u.x * N + (u.y-1)].thread = thread;
+                A[u.x * N + (u.y-1)].parent = &A[u.x * N + u.y];
+                queue.push(A[u.x * N + (u.y-1)]);
             } 
-            else if((A[u.x][u.y-1].visited_state == 'G' || A[u.x][u.y-1].visited_state == 'B') && A[u.x][u.y-1].thread != thread) {
+            else if((A[u.x * N + (u.y-1)].visited_state == 'G' || A[u.x * N + (u.y-1)].visited_state == 'B') && A[u.x * N + (u.y-1)].thread != thread) {
                 *intersection_node_found = true;
-                thread_nodes[0] = A[u.x][u.y]; thread_nodes[1] = A[u.x][u.y-1];
+                thread_nodes[0] = A[u.x * N + u.y]; thread_nodes[1] = A[u.x * N + (u.y-1)];
                 break;
             }
         }
         // Moving right
         if(u.y+1 < N) {
-            if(A[u.x][u.y+1].visited_state == 'W') {
-                A[u.x][u.y+1].visited_state = 'G';
-                A[u.x][u.y+1].thread = thread;
-                A[u.x][u.y+1].parent = &A[u.x][u.y];
-                queue.push(A[u.x][u.y+1]);
+            if(A[u.x * N + (u.y+1)].visited_state == 'W') {
+                A[u.x * N + (u.y+1)].visited_state = 'G';
+                A[u.x * N + (u.y+1)].thread = thread;
+                A[u.x * N + (u.y+1)].parent = &A[u.x * N + u.y];
+                queue.push(A[u.x * N + (u.y+1)]);
             } 
-            else if((A[u.x][u.y+1].visited_state == 'G' || A[u.x][u.y+1].visited_state == 'B') && A[u.x][u.y+1].thread != thread) {
+            else if((A[u.x * N + (u.y+1)].visited_state == 'G' || A[u.x * N + (u.y+1)].visited_state == 'B') && A[u.x * N + (u.y+1)].thread != thread) {
                 *intersection_node_found = true;
-                thread_nodes[0] = A[u.x][u.y]; thread_nodes[1] = A[u.x][u.y+1];                 
+                thread_nodes[0] = A[u.x * N + u.y]; thread_nodes[1] = A[u.x * N + (u.y+1)];                 
                 break;
             }
         }
